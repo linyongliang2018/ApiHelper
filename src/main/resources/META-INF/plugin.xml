@@ -1,18 +1,27 @@
 <!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
 <idea-plugin>
     <id>com.github.linyongliang2018.apihelper</id>
-    <name>ApiHelper Template</name>
+    <name>ApiHelper</name>
     <vendor>linyongliang2018</vendor>
 
     <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.lang</depends>
+    <depends>com.intellij.modules.java</depends>
 
     <resource-bundle>messages.MyBundle</resource-bundle>
 
     <extensions defaultExtensionNs="com.intellij">
-        <toolWindow factoryClass="com.github.linyongliang2018.apihelper.toolWindow.MyToolWindowFactory" id="MyToolWindow"/>
     </extensions>
 
-    <applicationListeners>
-        <listener class="com.github.linyongliang2018.apihelper.listeners.MyFrameStateListener" topic="com.intellij.ide.FrameStateListener"/>
-    </applicationListeners>
+
+    <actions>
+        <!-- Add your actions here -->
+        <action id="UploadToYapi" class="com.github.linyongliang2018.apihelper.services.UploadToYapi"
+                text="UploadToYapi"
+                description="UploadToYapi">
+            <add-to-group group-id="EditorLangPopupMenu" anchor="first"/>
+            <keyboard-shortcut keymap="$default" first-keystroke="alt u"/>
+        </action>
+    </actions>
+
 </idea-plugin>

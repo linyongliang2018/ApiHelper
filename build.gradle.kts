@@ -24,6 +24,13 @@ version = properties("pluginVersion").get()
 
 // Configure project's dependencies
 repositories {
+    // 依赖使用阿里云 maven 源
+    maven {
+        setUrl("https://maven.aliyun.com/repository/public/")
+    }
+    maven {
+        setUrl("https://maven.aliyun.com/repository/spring/")
+    }
     mavenCentral()
 }
 
@@ -37,9 +44,12 @@ intellij {
     pluginName.set(properties("pluginName"))
     version.set(properties("platformVersion"))
     type.set(properties("platformType"))
-
     // Plugin Dependencies. Uses `platformPlugins` property from the gradle.properties file.
     plugins.set(properties("platformPlugins").map { it.split(',').map(String::trim).filter(String::isNotEmpty) })
+}
+
+dependencies{
+    implementation("org.springframework:spring-web:5.3.27")
 }
 
 // Configure Gradle Changelog Plugin - read more: https://github.com/JetBrains/gradle-changelog-plugin
@@ -76,7 +86,7 @@ tasks {
             val start = "<!-- Plugin description -->"
             val end = "<!-- Plugin description end -->"
 
-            with (it.lines()) {
+            with(it.lines()) {
                 if (!containsAll(listOf(start, end))) {
                     throw GradleException("Plugin description section not found in README.md:\n$start ... $end")
                 }
@@ -119,6 +129,15 @@ tasks {
         // The pluginVersion is based on the SemVer (https://semver.org) and supports pre-release labels, like 2.1.7-alpha.3
         // Specify pre-release label to publish the plugin in a custom Release Channel automatically. Read more:
         // https://plugins.jetbrains.com/docs/intellij/deployment.html#specifying-a-release-channel
-        channels.set(properties("pluginVersion").map { listOf(it.split('-').getOrElse(1) { "default" }.split('.').first()) })
+        channels.set(properties("pluginVersion").map {
+            listOf(
+                it.split('-').getOrElse(1) { "default" }.split('.').first()
+            )
+        })
     }
+}
+
+
+tasks.withType<JavaCompile> {
+    options.encoding = "UTF-8"
 }
