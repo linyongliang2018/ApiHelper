@@ -1,8 +1,6 @@
 package com.github.linyongliang2018.apihelper.pojo;
 
 import java.io.Serializable;
-import java.util.List;
-import java.util.Map;
 
 /**
  * yapi dto
@@ -10,7 +8,7 @@ import java.util.Map;
  * @author chengsheng@qbb6.com
  * @date 2019/2/11 3:16 PM
  */
-public class YapiApiDTO implements Serializable {
+public class ApiDto implements Serializable {
     /**
      * 响应
      */
@@ -20,7 +18,7 @@ public class YapiApiDTO implements Serializable {
      */
     private String requestBody;
 
-    public YapiApiDTO() {
+    public ApiDto() {
     }
 
     public String getResponse() {

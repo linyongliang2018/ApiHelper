@@ -50,6 +50,7 @@ intellij {
 
 dependencies{
     implementation("org.springframework:spring-web:5.3.27")
+    implementation("javax.validation:validation-api:2.0.1.Final")
 }
 
 // Configure Gradle Changelog Plugin - read more: https://github.com/JetBrains/gradle-changelog-plugin

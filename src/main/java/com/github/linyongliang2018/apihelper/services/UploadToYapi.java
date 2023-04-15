@@ -1,9 +1,7 @@
 package com.github.linyongliang2018.apihelper.services;
 
 import com.github.linyongliang2018.apihelper.jsonSchema.BuildJsonForYapi;
-import com.github.linyongliang2018.apihelper.pojo.YapiApiDTO;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
+import com.github.linyongliang2018.apihelper.pojo.ApiDto;
 import com.intellij.notification.NotificationDisplayType;
 import com.intellij.notification.NotificationGroup;
 import com.intellij.openapi.actionSystem.AnAction;
@@ -12,7 +10,6 @@ import com.intellij.openapi.actionSystem.AnActionEvent;
 import java.awt.*;
 import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.StringSelection;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -31,10 +28,15 @@ public class UploadToYapi extends AnAction {
     @Override
     public void actionPerformed(AnActionEvent actionEvent) {
         //获得api 需上传的接口列表 参数对象
-        ArrayList<YapiApiDTO> yapiApiDTOS = new BuildJsonForYapi().actionPerformedList(actionEvent);
-        List<String> requestBodies = yapiApiDTOS.stream().map(YapiApiDTO::getResponse).collect(Collectors.toList());
+        BuildJsonForYapi buildJsonForYapi = new BuildJsonForYapi();
+        List<ApiDto> apiDtos = buildJsonForYapi.actionPerformedList(actionEvent);
+        List<String> requestBodies = apiDtos.stream().map(ApiDto::getResponse).collect(Collectors.toList());
         for (String requestBody : requestBodies) {
             System.out.println("requestBody = " + requestBody);
+        }
+        List<String> collect = apiDtos.stream().map(ApiDto::getRequestBody).collect(Collectors.toList());
+        for (String s : collect) {
+            System.out.println("s = " + s);
         }
     }
 

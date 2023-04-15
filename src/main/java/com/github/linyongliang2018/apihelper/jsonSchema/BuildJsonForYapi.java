@@ -2,9 +2,9 @@ package com.github.linyongliang2018.apihelper.jsonSchema;
 
 import com.github.linyongliang2018.apihelper.constant.JavaConstant;
 import com.github.linyongliang2018.apihelper.constant.SpringMVCConstant;
-import com.github.linyongliang2018.apihelper.pojo.YapiApiDTO;
-import com.github.linyongliang2018.apihelper.utils.DesUtil;
+import com.github.linyongliang2018.apihelper.pojo.ApiDto;
 import com.github.linyongliang2018.apihelper.utils.AnnotationUtil;
+import com.github.linyongliang2018.apihelper.utils.DesUtil;
 import com.google.common.base.Strings;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
@@ -19,7 +19,9 @@ import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.psi.util.PsiUtil;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -40,15 +42,15 @@ public class BuildJsonForYapi {
      * @param project         当前的项目
      * @return
      */
-    public static YapiApiDTO actionPerformed(PsiMethod psiMethodTarget, Project project) {
-        YapiApiDTO yapiApiDTO = new YapiApiDTO();
+    public static ApiDto actionPerformed(PsiMethod psiMethodTarget, Project project) {
+        ApiDto apiDto = new ApiDto();
         try {
             // 生成响应参数
             String response = getPojoJson(project, psiMethodTarget.getReturnType());
-            yapiApiDTO.setResponse(response);
+            apiDto.setResponse(response);
             String request = getRequest(project, psiMethodTarget);
-            yapiApiDTO.setRequestBody(request);
-            return yapiApiDTO;
+            apiDto.setRequestBody(request);
+            return apiDto;
         } catch (Exception ex) {
             Notification error = notificationGroup.createNotification("Convert to JSON failed.", NotificationType.ERROR);
             Notifications.Bus.notify(error, project);
@@ -76,116 +78,30 @@ public class BuildJsonForYapi {
     }
 
     public static String getPojoJson(Project project, PsiType psiType) {
-        if (psiType instanceof PsiPrimitiveType) {
-            //如果是基本类型
-            KV kvClass = new KV();
-            kvClass.put(psiType.getCanonicalText(), NormalTypes.NORMAL_TYPES.get(psiType.getPresentableText()));
-        } else if (NormalTypes.isNormalType(psiType.getPresentableText())) {
-            //如果是包装类型
-            KV kvClass = new KV();
-            kvClass.put(psiType.getCanonicalText(), NormalTypes.NORMAL_TYPES.get(psiType.getPresentableText()));
-        } else if (psiType.getPresentableText().startsWith("List")) {
-            String[] types = psiType.getCanonicalText().split("<");
-            KV listKv = new KV();
-            if (types.length > 1) {
-                String childPackage = types[1].split(">")[0];
-                if (NormalTypes.NORMAL_TYPES_PACKAGES.containsKey(childPackage)) {
-                    String[] childTypes = childPackage.split("\\.");
-                    listKv.put("type", childTypes[childTypes.length - 1]);
-                } else if (NormalTypes.COLLECT_TYPES_PACKAGES.containsKey(childPackage)) {
-                    String[] childTypes = childPackage.split("\\.");
-                    listKv.put("type", childTypes[childTypes.length - 1]);
-                } else {
-                    PsiClass psiClassChild = JavaPsiFacade.getInstance(project).findClass(childPackage, GlobalSearchScope.allScope(project));
-                    List<String> requiredList = new ArrayList<>();
-                    KV kvObject = getFields(psiClassChild, project, null, null, requiredList);
-                    listKv.put("type", "object");
-                    listKv.put("properties", kvObject);
-                    listKv.put("required", requiredList);
-                }
-            }
+        String[] types = psiType.getCanonicalText().split("<");
+        if (types.length > 1) {
+            PsiClass psiClassChild = JavaPsiFacade.getInstance(project).findClass(types[0], GlobalSearchScope.allScope(project));
             KV result = new KV();
-            result.put("type", "array");
-            result.put("title", psiType.getPresentableText());
-            result.put("description", psiType.getPresentableText());
-            result.put("items", listKv);
-            String json = new GsonBuilder().setPrettyPrinting().create().toJson(result);
-            return json;
-        } else if (psiType.getPresentableText().startsWith("Set")) {
-            String[] types = psiType.getCanonicalText().split("<");
-            KV listKv = new KV();
-            if (types.length > 1) {
-                String childPackage = types[1].split(">")[0];
-                if (NormalTypes.NORMAL_TYPES_PACKAGES.containsKey(childPackage)) {
-                    String[] childTypes = childPackage.split("\\.");
-                    listKv.put("type", childTypes[childTypes.length - 1]);
-                } else if (NormalTypes.COLLECT_TYPES_PACKAGES.containsKey(childPackage)) {
-                    String[] childTypes = childPackage.split("\\.");
-                    listKv.put("type", childTypes[childTypes.length - 1]);
-                } else {
-                    PsiClass psiClassChild = JavaPsiFacade.getInstance(project).findClass(childPackage, GlobalSearchScope.allScope(project));
-                    List<String> requiredList = new ArrayList<>();
-                    KV kvObject = getFields(psiClassChild, project, null, null, requiredList);
-                    listKv.put("type", "object");
-                    listKv.put("properties", kvObject);
-                    listKv.put("required", requiredList);
-                }
-            }
-            KV result = new KV();
-            result.put("type", "array");
-            result.put("title", psiType.getPresentableText());
-            result.put("description", psiType.getPresentableText());
-            result.put("items", listKv);
-            String json = new GsonBuilder().setPrettyPrinting().create().toJson(result);
-            return json;
-        } else if (psiType.getPresentableText().startsWith("Map")) {
-            HashMap hashMapChild = new HashMap();
-            String[] types = psiType.getCanonicalText().split("<");
-            if (types.length > 1) {
-                hashMapChild.put("paramMap", psiType.getPresentableText());
-            }
-            KV kvClass = new KV();
-            kvClass.put(types[0], hashMapChild);
-            KV result = new KV();
+            List<String> requiredList = new ArrayList<>();
+            KV kvObject = getFields(psiClassChild, project, types, 1, requiredList);
             result.put("type", "object");
             result.put("title", psiType.getPresentableText());
-            result.put("description", psiType.getPresentableText());
-            result.put("properties", hashMapChild);
-            String json = new GsonBuilder().setPrettyPrinting().create().toJson(result);
-            return json;
-        } else if (NormalTypes.COLLECT_TYPES.containsKey(psiType.getPresentableText())) {
-            //如果是集合类型
-            KV kvClass = new KV();
-            kvClass.put(psiType.getCanonicalText(), NormalTypes.COLLECT_TYPES.get(psiType.getPresentableText()));
+            result.put("required", requiredList);
+            result.put("description", (psiType.getPresentableText() + " :" + psiClassChild.getName()).trim());
+            result.put("properties", kvObject);
+            return new GsonBuilder().setPrettyPrinting().create().toJson(result);
         } else {
-            String[] types = psiType.getCanonicalText().split("<");
-            if (types.length > 1) {
-                PsiClass psiClassChild = JavaPsiFacade.getInstance(project).findClass(types[0], GlobalSearchScope.allScope(project));
-                KV result = new KV();
-                List<String> requiredList = new ArrayList<>();
-                KV kvObject = getFields(psiClassChild, project, types, 1, requiredList);
-                result.put("type", "object");
-                result.put("title", psiType.getPresentableText());
-                result.put("required", requiredList);
-                result.put("description", (psiType.getPresentableText() + " :" + psiClassChild.getName()).trim());
-                result.put("properties", kvObject);
-                String json = new GsonBuilder().setPrettyPrinting().create().toJson(result);
-                return json;
-            } else {
-                PsiClass psiClassChild = JavaPsiFacade.getInstance(project).findClass(psiType.getCanonicalText(), GlobalSearchScope.allScope(project));
-                KV result = new KV();
-                List<String> requiredList = new ArrayList<>();
-                KV kvObject = getFields(psiClassChild, project, null, null, requiredList);
-                result.put("type", "object");
-                result.put("required", requiredList);
-                result.put("title", psiType.getPresentableText());
-                result.put("description", (psiType.getPresentableText() + " :" + psiClassChild.getName()).trim());
-                result.put("properties", kvObject);
-                String json = new GsonBuilder().setPrettyPrinting().create().toJson(result);
-                return json;
-            }
+            PsiClass psiClassChild = JavaPsiFacade.getInstance(project).findClass(psiType.getCanonicalText(), GlobalSearchScope.allScope(project));
+            KV result = new KV();
+            List<String> requiredList = new ArrayList<>();
+            KV kvObject = getFields(psiClassChild, project, null, null, requiredList);
+            result.put("type", "object");
+            result.put("required", requiredList);
+            result.put("title", psiType.getPresentableText());
+            result.put("description", (psiType.getPresentableText() + " :" + psiClassChild.getName()).trim());
+            result.put("properties", kvObject);
+            return new GsonBuilder().setPrettyPrinting().create().toJson(result);
         }
-        return null;
     }
 
     /**
@@ -243,8 +159,6 @@ public class BuildJsonForYapi {
         String remark = "";
         if (field.getDocComment() != null) {
             remark = DesUtil.getFiledDesc(field.getDocComment());
-            //获得link 备注
-            remark = DesUtil.getLinkRemark(remark, project, field);
         }
         // 如果是基本类型
         if (type instanceof PsiPrimitiveType) {
@@ -406,7 +320,7 @@ public class BuildJsonForYapi {
      * @param actionEvent
      * @return
      */
-    public ArrayList<YapiApiDTO> actionPerformedList(AnActionEvent actionEvent) {
+    public List<ApiDto> actionPerformedList(AnActionEvent actionEvent) {
         Editor editor = actionEvent.getDataContext().getData(CommonDataKeys.EDITOR);
         PsiFile psiFile = actionEvent.getDataContext().getData(CommonDataKeys.PSI_FILE);
         String selectedText = actionEvent.getRequiredData(CommonDataKeys.EDITOR).getSelectionModel().getSelectedText();
@@ -418,14 +332,14 @@ public class BuildJsonForYapi {
         }
         PsiElement referenceAt = psiFile.findElementAt(editor.getCaretModel().getOffset());
         PsiClass selectedClass = (PsiClass) PsiTreeUtil.getContextOfType(referenceAt, new Class[]{PsiClass.class});
-        ArrayList<YapiApiDTO> yapiApiDTOS = new ArrayList<>();
+        List<ApiDto> apiDtos = new ArrayList<>();
         if (selectedText.equals(selectedClass.getName())) {
             PsiMethod[] psiMethods = selectedClass.getMethods();
             for (PsiMethod psiMethodTarget : psiMethods) {
                 //去除私有方法
                 if (!psiMethodTarget.getModifierList().hasModifierProperty("private")) {
-                    YapiApiDTO yapiApiDTO = actionPerformed(psiMethodTarget, project);
-                    yapiApiDTOS.add(yapiApiDTO);
+                    ApiDto apiDto = actionPerformed(psiMethodTarget, project);
+                    apiDtos.add(apiDto);
                 }
             }
         } else {
@@ -439,15 +353,51 @@ public class BuildJsonForYapi {
                 }
             }
             if (Objects.nonNull(psiMethodTarget)) {
-                YapiApiDTO yapiApiDTO = actionPerformed(psiMethodTarget, project);
-                yapiApiDTOS.add(yapiApiDTO);
+                ApiDto apiDto = actionPerformed(psiMethodTarget, project);
+                apiDtos.add(apiDto);
             } else {
                 Notification error = notificationGroup.createNotification("can not find method:" + selectedText, NotificationType.ERROR);
                 Notifications.Bus.notify(error, project);
                 return null;
             }
         }
-        return yapiApiDTOS;
+        return apiDtos;
     }
 
+
+    public void actionPerformed(AnActionEvent e) {
+        // 获取当前项目和编辑器
+        Project project = e.getProject();
+        Editor editor = e.getRequiredData(CommonDataKeys.EDITOR);
+
+        // 获取当前文件
+        PsiFile psiFile = PsiDocumentManager.getInstance(project).getPsiFile(editor.getDocument());
+
+        // 获取当前光标位置的元素
+        int offset = editor.getCaretModel().getOffset();
+        PsiElement elementAtOffset = psiFile.findElementAt(offset);
+
+        // 从光标位置向上查找方法
+        PsiMethod method = PsiTreeUtil.getParentOfType(elementAtOffset, PsiMethod.class);
+
+        if (method != null) {
+            boolean requestBodyAnnotationFound = false;
+
+            // 遍历方法参数
+            for (PsiParameter parameter : method.getParameterList().getParameters()) {
+                // 检查参数是否使用了@RequestBody注解
+                PsiAnnotation requestBodyAnnotation = parameter.getAnnotation("org.springframework.web.bind.annotation.RequestBody");
+                if (requestBodyAnnotation != null) {
+                    requestBodyAnnotationFound = true;
+                    System.out.println("参数 '" + parameter.getName() + "' 使用了 @RequestBody 注解。");
+                }
+            }
+
+            if (!requestBodyAnnotationFound) {
+                System.out.println("在此方法中没有找到使用 @RequestBody 注解的参数。");
+            }
+        } else {
+            System.out.println("当前光标位置找不到方法。");
+        }
+    }
 }
