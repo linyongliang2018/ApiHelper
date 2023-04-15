@@ -1,7 +1,8 @@
 package com.github.linyongliang2018.apihelper.app
 
-import com.github.linyongliang2018.apihelper.jsonSchema.BuildJsonForYapi
 import com.github.linyongliang2018.apihelper.pojo.JsonType
+import com.github.linyongliang2018.apihelper.utils.JsonUtils.getPojoJson
+import com.github.linyongliang2018.apihelper.utils.JsonUtils.getRequest
 import com.intellij.notification.NotificationDisplayType
 import com.intellij.notification.NotificationGroup
 import com.intellij.notification.NotificationType
@@ -34,8 +35,8 @@ class JsonSchemaGenerate {
     fun actionPerformed(psiMethodTarget: PsiMethod, project: Project): JsonType? {
         try {
             // 生成响应参数
-            val response = BuildJsonForYapi.getPojoJson(project, psiMethodTarget.returnType)
-            val request = BuildJsonForYapi.getRequest(project, psiMethodTarget)
+            val response = getPojoJson(project, psiMethodTarget.returnType)
+            val request = getRequest(project, psiMethodTarget)
             return JsonType(request, response)
         } catch (ex: Exception) {
             val error = notificationGroup.createNotification("生成JsonSchema失败了！", NotificationType.ERROR)

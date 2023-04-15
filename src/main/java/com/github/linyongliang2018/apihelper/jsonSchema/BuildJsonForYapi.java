@@ -18,12 +18,17 @@ import com.intellij.psi.impl.source.PsiClassReferenceType;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.psi.util.PsiUtil;
+import org.apache.commons.lang3.StringUtils;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+
+import static com.github.linyongliang2018.apihelper.utils.JsonUtils.getPojoJson;
+import static com.github.linyongliang2018.apihelper.utils.JsonUtils.getRequest;
 
 /**
  * @description: 为了yapi 创建的
@@ -58,51 +63,7 @@ public class BuildJsonForYapi {
         return null;
     }
 
-    /**
-     * @description: 获得请求参数
-     * @param: [project, yapiApiDTO, psiMethodTarget]
-     * @return: void
-     * @author: chengsheng@qbb6.com
-     * @date: 2019/2/19
-     */
-    public static String getRequest(Project project, PsiMethod psiMethodTarget) {
-        PsiParameter[] psiParameters = psiMethodTarget.getParameterList().getParameters();
-        for (PsiParameter psiParameter : psiParameters) {
-            // 找到requestBody
-            PsiAnnotation psiAnnotation = AnnotationUtil.findAnnotation(psiParameter, SpringMVCConstant.REQUEST_BODY);
-            if (psiAnnotation != null) {
-                return getPojoJson(project, psiParameter.getType());
-            }
-        }
-        return null;
-    }
 
-    public static String getPojoJson(Project project, PsiType psiType) {
-        String[] types = psiType.getCanonicalText().split("<");
-        if (types.length > 1) {
-            PsiClass psiClassChild = JavaPsiFacade.getInstance(project).findClass(types[0], GlobalSearchScope.allScope(project));
-            KV result = new KV();
-            List<String> requiredList = new ArrayList<>();
-            KV kvObject = getFields(psiClassChild, project, types, 1, requiredList);
-            result.put("type", "object");
-            result.put("title", psiType.getPresentableText());
-            result.put("required", requiredList);
-            result.put("description", (psiType.getPresentableText() + " :" + psiClassChild.getName()).trim());
-            result.put("properties", kvObject);
-            return new GsonBuilder().setPrettyPrinting().create().toJson(result);
-        } else {
-            PsiClass psiClassChild = JavaPsiFacade.getInstance(project).findClass(psiType.getCanonicalText(), GlobalSearchScope.allScope(project));
-            KV result = new KV();
-            List<String> requiredList = new ArrayList<>();
-            KV kvObject = getFields(psiClassChild, project, null, null, requiredList);
-            result.put("type", "object");
-            result.put("required", requiredList);
-            result.put("title", psiType.getPresentableText());
-            result.put("description", (psiType.getPresentableText() + " :" + psiClassChild.getName()).trim());
-            result.put("properties", kvObject);
-            return new GsonBuilder().setPrettyPrinting().create().toJson(result);
-        }
-    }
 
     /**
      * @description: 获得属性列表
@@ -111,8 +72,8 @@ public class BuildJsonForYapi {
      * @author: chengsheng@qbb6.com
      * @date: 2019/5/15
      */
-    public static KV getFields(PsiClass psiClass, Project project, String[] childType, Integer index, List<String> requiredList) {
-        KV kv = new KV();
+    public static LinkedHashMap<String, Object> getFields(PsiClass psiClass, Project project, String[] childType, Integer index, List<String> requiredList) {
+        LinkedHashMap<String,Object> kv = new KV();
         if (psiClass != null) {
             if (Objects.nonNull(psiClass.getSuperClass()) && Objects.nonNull(NormalTypes.COLLECT_TYPES.get(psiClass.getSuperClass().getName()))) {
                 for (PsiField field : psiClass.getFields()) {
@@ -150,7 +111,7 @@ public class BuildJsonForYapi {
      * @author: chengsheng@qbb6.com
      * @date: 2019/5/15
      */
-    public static void getField(PsiField field, Project project, KV kv, String[] childType, Integer index, String pName) {
+    public static void getField(PsiField field, Project project, LinkedHashMap<String, Object> kv, String[] childType, Integer index, String pName) {
         if (field.getModifierList().hasModifierProperty("final")) {
             return;
         }
@@ -195,21 +156,20 @@ public class BuildJsonForYapi {
                         getCollect(kv, psiClassChild.getName(), remark, psiClassChild, project, name, pName, childType, index + 1);
                     } else {
                         //class type
-                        KV kv1 = new KV();
+                        LinkedHashMap<String, Object> kv1 = new KV();
                         kv1.putAll(new KV().set("type", "object"));
                         PsiClass psiClassChild = JavaPsiFacade.getInstance(project).findClass(child, GlobalSearchScope.allScope(project));
                         kv1.putAll(new KV().set("description", (Strings.isNullOrEmpty(remark) ? (psiClassChild.getName().trim()) : remark + " ," + psiClassChild.getName().trim())));
                         if (!pName.equals(psiClassChild.getName())) {
                             List<String> requiredList = new ArrayList<>();
                             kv1.putAll(new KV().set("properties", getFields(psiClassChild, project, childType, index + 1, requiredList)));
-                            kv1.set("required", requiredList);
+                            kv1.put("required", requiredList);
                         } else {
                             kv1.putAll(new KV().set("type", pName));
                         }
                         kv.put(name, kv1);
                     }
                 }
-                //    getField()
             } else if (type instanceof PsiArrayType) {
                 //array type
                 PsiType deepType = type.getDeepComponentType();
@@ -239,10 +199,10 @@ public class BuildJsonForYapi {
                         kvlist.putAll(new KV().set("type", pName));
                     }
                 }
-                KV kv1 = new KV();
+                LinkedHashMap<String, Object> kv1 = new KV();
                 kv1.putAll(new KV().set("type", "array"));
                 kv1.putAll(new KV().set("description", (remark + " :" + cType).trim()));
-                kv1.set("items", kvlist);
+                kv1.put("items", kvlist);
                 kv.put(name, kv1);
             } else if (fieldTypeName.startsWith("List") || fieldTypeName.startsWith("Set") || fieldTypeName.startsWith("HashSet")) {
                 //list type
@@ -288,8 +248,8 @@ public class BuildJsonForYapi {
      * @author: chengsheng@qbb6.com
      * @date: 2019/5/15
      */
-    public static void getCollect(KV kv, String classTypeName, String remark, PsiClass psiClass, Project project, String name, String pName, String[] childType, Integer index) {
-        KV kvlist = new KV();
+    public static void getCollect(LinkedHashMap<String, Object> kv, String classTypeName, String remark, PsiClass psiClass, Project project, String name, String pName, String[] childType, Integer index) {
+        LinkedHashMap<String, Object> kvlist = new KV();
         if (NormalTypes.isNormalType(classTypeName) || NormalTypes.COLLECT_TYPES.containsKey(classTypeName)) {
             kvlist.put("type", classTypeName);
             if (!Strings.isNullOrEmpty(remark)) {
@@ -330,35 +290,29 @@ public class BuildJsonForYapi {
             Notifications.Bus.notify(error, project);
             return null;
         }
+        // 获取当前光标位置的元素
         PsiElement referenceAt = psiFile.findElementAt(editor.getCaretModel().getOffset());
-        PsiClass selectedClass = (PsiClass) PsiTreeUtil.getContextOfType(referenceAt, new Class[]{PsiClass.class});
+        PsiClass selectedClass = PsiTreeUtil.getContextOfType(referenceAt, PsiClass.class);
         List<ApiDto> apiDtos = new ArrayList<>();
-        if (selectedText.equals(selectedClass.getName())) {
-            PsiMethod[] psiMethods = selectedClass.getMethods();
-            for (PsiMethod psiMethodTarget : psiMethods) {
-                //去除私有方法
-                if (!psiMethodTarget.getModifierList().hasModifierProperty("private")) {
-                    ApiDto apiDto = actionPerformed(psiMethodTarget, project);
+        // 判断是否直接作用于整个controller类上面
+        if (StringUtils.equals(selectedText, selectedClass.getName())) {
+            // 获取光标选择的方法
+            for (PsiMethod psiMethod : selectedClass.getMethods()) {
+                // 过滤私有方法
+                if (!psiMethod.getModifierList().hasModifierProperty(PsiModifier.PRIVATE)) {
+                    ApiDto apiDto = actionPerformed(psiMethod, project);
                     apiDtos.add(apiDto);
                 }
             }
         } else {
-            PsiMethod[] psiMethods = selectedClass.getAllMethods();
-            //寻找目标Method
-            PsiMethod psiMethodTarget = null;
-            for (PsiMethod psiMethod : psiMethods) {
-                if (psiMethod.getName().equals(selectedText)) {
-                    psiMethodTarget = psiMethod;
+            // 找到特定的method
+            for (PsiMethod psiMethod : selectedClass.getMethods()) {
+                if (!psiMethod.getModifierList().hasModifierProperty(PsiModifier.PRIVATE)
+                        && StringUtils.equals(psiMethod.getName(), selectedText)) {
+                    ApiDto apiDto = actionPerformed(psiMethod, project);
+                    apiDtos.add(apiDto);
                     break;
                 }
-            }
-            if (Objects.nonNull(psiMethodTarget)) {
-                ApiDto apiDto = actionPerformed(psiMethodTarget, project);
-                apiDtos.add(apiDto);
-            } else {
-                Notification error = notificationGroup.createNotification("can not find method:" + selectedText, NotificationType.ERROR);
-                Notifications.Bus.notify(error, project);
-                return null;
             }
         }
         return apiDtos;
