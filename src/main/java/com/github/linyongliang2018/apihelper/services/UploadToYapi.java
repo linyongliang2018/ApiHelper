@@ -1,6 +1,6 @@
 package com.github.linyongliang2018.apihelper.services;
 
-import com.github.linyongliang2018.apihelper.jsonSchema.BuildJsonForYapi;
+import com.github.linyongliang2018.apihelper.jsonSchema.GeneratorJsonSechema;
 import com.github.linyongliang2018.apihelper.pojo.ApiDto;
 import com.intellij.notification.NotificationDisplayType;
 import com.intellij.notification.NotificationGroup;
@@ -28,8 +28,8 @@ public class UploadToYapi extends AnAction {
     @Override
     public void actionPerformed(AnActionEvent actionEvent) {
         //获得api 需上传的接口列表 参数对象
-        BuildJsonForYapi buildJsonForYapi = new BuildJsonForYapi();
-        List<ApiDto> apiDtos = buildJsonForYapi.actionPerformedList(actionEvent);
+        GeneratorJsonSechema generatorJsonSechema = new GeneratorJsonSechema();
+        List<ApiDto> apiDtos = generatorJsonSechema.actionPerformedList(actionEvent);
         List<String> requestBodies = apiDtos.stream().map(ApiDto::getResponse).collect(Collectors.toList());
         for (String requestBody : requestBodies) {
             System.out.println("requestBody = " + requestBody);

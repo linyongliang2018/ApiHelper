@@ -1,7 +1,7 @@
 package com.github.linyongliang2018.apihelper.app
 
 import com.github.linyongliang2018.apihelper.pojo.JsonType
-import com.github.linyongliang2018.apihelper.utils.JsonUtils.getPojoJson
+import com.github.linyongliang2018.apihelper.utils.JsonUtils.convertToJsonSchema
 import com.github.linyongliang2018.apihelper.utils.JsonUtils.getRequest
 import com.intellij.notification.NotificationDisplayType
 import com.intellij.notification.NotificationGroup
@@ -35,7 +35,7 @@ class JsonSchemaGenerate {
     fun actionPerformed(psiMethodTarget: PsiMethod, project: Project): JsonType? {
         try {
             // 生成响应参数
-            val response = getPojoJson(project, psiMethodTarget.returnType)
+            val response = convertToJsonSchema(project, psiMethodTarget.returnType)
             val request = getRequest(project, psiMethodTarget)
             return JsonType(request, response)
         } catch (ex: Exception) {

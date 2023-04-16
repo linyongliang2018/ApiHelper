@@ -20,7 +20,15 @@
                 text="UploadToYapi"
                 description="UploadToYapi">
             <add-to-group group-id="EditorLangPopupMenu" anchor="first"/>
-            <keyboard-shortcut keymap="$default" first-keystroke="alt u"/>
+<!--            <keyboard-shortcut keymap="$default" first-keystroke="alt u"/>-->
+        </action>
+
+        <!-- Add your actions here -->
+        <action id="initRequestJsonSchema" class="com.github.linyongliang2018.apihelper.action.JsonSchemaAction"
+                text="InitRequestJsonSchema"
+                description="InitRequestJsonSchema">
+            <add-to-group group-id="EditorLangPopupMenu" anchor="first"/>
+<!--            <keyboard-shortcut keymap="$default" first-keystroke="alt u"/>-->
         </action>
     </actions>
 

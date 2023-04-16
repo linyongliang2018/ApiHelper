@@ -1,12 +1,10 @@
 package com.github.linyongliang2018.apihelper.jsonSchema;
 
 import com.github.linyongliang2018.apihelper.constant.JavaConstant;
-import com.github.linyongliang2018.apihelper.constant.SpringMVCConstant;
 import com.github.linyongliang2018.apihelper.pojo.ApiDto;
 import com.github.linyongliang2018.apihelper.utils.AnnotationUtil;
 import com.github.linyongliang2018.apihelper.utils.DesUtil;
 import com.google.common.base.Strings;
-import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.intellij.notification.*;
 import com.intellij.openapi.actionSystem.AnActionEvent;
@@ -20,22 +18,18 @@ import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.psi.util.PsiUtil;
 import org.apache.commons.lang3.StringUtils;
 
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
-import static com.github.linyongliang2018.apihelper.utils.JsonUtils.getPojoJson;
-import static com.github.linyongliang2018.apihelper.utils.JsonUtils.getRequest;
+import static com.github.linyongliang2018.apihelper.utils.JsonUtils.*;
 
 /**
  * @description: 为了yapi 创建的
  * @author: chengsheng@qbb6.com
  * @date: 2018/10/27
  */
-public class BuildJsonForYapi {
+public class GeneratorJsonSechema {
     private static final NotificationGroup notificationGroup;
 
     static {
@@ -51,7 +45,7 @@ public class BuildJsonForYapi {
         ApiDto apiDto = new ApiDto();
         try {
             // 生成响应参数
-            String response = getPojoJson(project, psiMethodTarget.getReturnType());
+            String response = convertToJsonSchema(project, psiMethodTarget.getReturnType());
             apiDto.setResponse(response);
             String request = getRequest(project, psiMethodTarget);
             apiDto.setRequestBody(request);
@@ -64,7 +58,6 @@ public class BuildJsonForYapi {
     }
 
 
-
     /**
      * @description: 获得属性列表
      * @param: [psiClass, project, childType, index]
@@ -72,10 +65,10 @@ public class BuildJsonForYapi {
      * @author: chengsheng@qbb6.com
      * @date: 2019/5/15
      */
-    public static LinkedHashMap<String, Object> getFields(PsiClass psiClass, Project project, String[] childType, Integer index, List<String> requiredList) {
-        LinkedHashMap<String,Object> kv = new KV();
+    public static Map<String, Object> getFields(PsiClass psiClass, Project project, String[] childType, Integer index, List<String> requiredList) {
+        Map<String, Object> kv = new LinkedHashMap<>();
         if (psiClass != null) {
-            if (Objects.nonNull(psiClass.getSuperClass()) && Objects.nonNull(NormalTypes.COLLECT_TYPES.get(psiClass.getSuperClass().getName()))) {
+            if (Objects.nonNull(psiClass.getSuperClass()) && Objects.nonNull(TypeConstant.COLLECT_TYPES.get(psiClass.getSuperClass().getName()))) {
                 for (PsiField field : psiClass.getFields()) {
                     //如果是有notnull 和 notEmpty 注解就加入必填
                     if (Objects.nonNull(AnnotationUtil.findAnnotation(field, JavaConstant.NOT_NULL))
@@ -85,7 +78,7 @@ public class BuildJsonForYapi {
                     getField(field, project, kv, childType, index, psiClass.getName());
                 }
             } else {
-                if (NormalTypes.GENERIC_LIST.contains(psiClass.getName()) && childType != null && childType.length > index) {
+                if (TypeConstant.GENERIC_LIST.contains(psiClass.getName()) && childType != null && childType.length > index) {
                     String child = childType[index].split(">")[0];
                     PsiClass psiClassChild = JavaPsiFacade.getInstance(project).findClass(child, GlobalSearchScope.allScope(project));
                     return getFields(psiClassChild, project, childType, index + 1, requiredList);
@@ -105,13 +98,9 @@ public class BuildJsonForYapi {
     }
 
     /**
-     * @description: 获得单个属性
-     * @param: [field, project, kv, childType, index, pName]
-     * @return: void
-     * @author: chengsheng@qbb6.com
-     * @date: 2019/5/15
+     * 填充单个属性
      */
-    public static void getField(PsiField field, Project project, LinkedHashMap<String, Object> kv, String[] childType, Integer index, String pName) {
+    public static void getField(PsiField field, Project project, Map<String, Object> kv, String[] childType, Integer index, String pName) {
         if (field.getModifierList().hasModifierProperty("final")) {
             return;
         }
@@ -133,7 +122,7 @@ public class BuildJsonForYapi {
             //reference Type
             String fieldTypeName = type.getPresentableText();
             //normal Type
-            if (NormalTypes.isNormalType(fieldTypeName)) {
+            if (TypeConstant.isNormalType(fieldTypeName)) {
                 JsonObject jsonObject = new JsonObject();
                 jsonObject.addProperty("type", fieldTypeName);
                 if (!Strings.isNullOrEmpty(remark)) {
@@ -147,25 +136,27 @@ public class BuildJsonForYapi {
                     jsonObject.addProperty("description", remark);
                 }
                 kv.put(name, jsonObject);
-            } else if (NormalTypes.GENERIC_LIST.contains(fieldTypeName)) {
+            } else if (TypeConstant.GENERIC_LIST.contains(fieldTypeName)) {
                 if (childType != null) {
                     String child = childType[index].split(">")[0];
                     if (child.contains("java.util.List") || child.contains("java.util.Set") || child.contains("java.util.HashSet")) {
                         index = index + 1;
                         PsiClass psiClassChild = JavaPsiFacade.getInstance(project).findClass(childType[index].split(">")[0], GlobalSearchScope.allScope(project));
-                        getCollect(kv, psiClassChild.getName(), remark, psiClassChild, project, name, pName, childType, index + 1);
+                        doFillCollect(kv, psiClassChild.getName(), remark, psiClassChild, project, name, pName, childType, index + 1);
                     } else {
                         //class type
-                        LinkedHashMap<String, Object> kv1 = new KV();
-                        kv1.putAll(new KV().set("type", "object"));
+                        Map<String, Object> kv1 = new LinkedHashMap<>();
+                        kv1.put("type", "object");
                         PsiClass psiClassChild = JavaPsiFacade.getInstance(project).findClass(child, GlobalSearchScope.allScope(project));
-                        kv1.putAll(new KV().set("description", (Strings.isNullOrEmpty(remark) ? (psiClassChild.getName().trim()) : remark + " ," + psiClassChild.getName().trim())));
+                        String realRemark = Strings.isNullOrEmpty(remark) ? (psiClassChild.getName().trim()) : remark + " ," + psiClassChild.getName().trim();
+                        kv1.put("description", realRemark);
                         if (!pName.equals(psiClassChild.getName())) {
                             List<String> requiredList = new ArrayList<>();
-                            kv1.putAll(new KV().set("properties", getFields(psiClassChild, project, childType, index + 1, requiredList)));
+                            Map<String, Object> fields = getFields(psiClassChild, project, childType, index + 1, requiredList);
+                            kv1.put("properties", fields);
                             kv1.put("required", requiredList);
                         } else {
-                            kv1.putAll(new KV().set("type", pName));
+                            kv1.put("type", pName);
                         }
                         kv.put(name, kv1);
                     }
@@ -173,7 +164,7 @@ public class BuildJsonForYapi {
             } else if (type instanceof PsiArrayType) {
                 //array type
                 PsiType deepType = type.getDeepComponentType();
-                KV kvlist = new KV();
+                Map<String, Object> kvlist = new LinkedHashMap<String, Object>();
                 String deepTypeName = deepType.getPresentableText();
                 String cType = "";
                 if (deepType instanceof PsiPrimitiveType) {
@@ -181,27 +172,29 @@ public class BuildJsonForYapi {
                     if (!Strings.isNullOrEmpty(remark)) {
                         kvlist.put("description", remark);
                     }
-                } else if (NormalTypes.isNormalType(deepTypeName)) {
+                } else if (TypeConstant.isNormalType(deepTypeName)) {
                     kvlist.put("type", deepTypeName);
                     if (!Strings.isNullOrEmpty(remark)) {
                         kvlist.put("description", remark);
                     }
                 } else {
-                    kvlist.putAll(new KV().set("type", "object"));
+                    kvlist.put("type", "object");
                     PsiClass psiClass = PsiUtil.resolveClassInType(deepType);
                     cType = psiClass.getName();
-                    kvlist.putAll(new KV().set("description", (Strings.isNullOrEmpty(remark) ? (psiClass.getName().trim()) : remark + " ," + psiClass.getName().trim())));
+                    String realRemark = Strings.isNullOrEmpty(remark) ? (psiClass.getName().trim()) : remark + " ," + psiClass.getName().trim();
+                    kvlist.put("description", realRemark);
                     if (!pName.equals(PsiUtil.resolveClassInType(deepType).getName())) {
                         List<String> requiredList = new ArrayList<>();
                         kvlist.put("properties", getFields(psiClass, project, null, null, requiredList));
                         kvlist.put("required", requiredList);
                     } else {
-                        kvlist.putAll(new KV().set("type", pName));
+                        kvlist.put("type", pName);
                     }
                 }
-                LinkedHashMap<String, Object> kv1 = new KV();
-                kv1.putAll(new KV().set("type", "array"));
-                kv1.putAll(new KV().set("description", (remark + " :" + cType).trim()));
+                Map<String, Object> kv1 = new LinkedHashMap<>();
+                kv1.put("type", "array");
+                String trim = (remark + " :" + cType).trim();
+                kv1.put("description", trim);
                 kv1.put("items", kvlist);
                 kv.put(name, kv1);
             } else if (fieldTypeName.startsWith("List") || fieldTypeName.startsWith("Set") || fieldTypeName.startsWith("HashSet")) {
@@ -210,7 +203,7 @@ public class BuildJsonForYapi {
                 PsiClass iterableClass = PsiUtil.resolveClassInClassTypeOnly(iterableType);
                 if (Objects.nonNull(iterableClass)) {
                     String classTypeName = iterableClass.getName();
-                    getCollect(kv, classTypeName, remark, iterableClass, project, name, pName, childType, index);
+                    doFillCollect(kv, classTypeName, remark, iterableClass, project, name, pName, childType, index);
                 }
             } else if (fieldTypeName.startsWith("HashMap") || fieldTypeName.startsWith("Map") || fieldTypeName.startsWith("LinkedHashMap")) {
                 //HashMap or Map
@@ -225,16 +218,18 @@ public class BuildJsonForYapi {
                 });
             } else {
                 //class type
-                KV kv1 = new KV();
+                Map<String, Object> kv1 = new LinkedHashMap<>();
                 PsiClass psiClass = PsiUtil.resolveClassInType(type);
-                kv1.putAll(new KV().set("type", "object"));
-                kv1.putAll(new KV().set("description", (Strings.isNullOrEmpty(remark) ? (psiClass.getName().trim()) : (remark + " ," + psiClass.getName()).trim())));
+                kv1.put("type", "object");
+                String realRemark = Strings.isNullOrEmpty(remark) ? (psiClass.getName().trim()) : (remark + " ," + psiClass.getName()).trim();
+                kv1.put("description", realRemark);
                 if (!pName.equals(((PsiClassReferenceType) type).getClassName())) {
                     List<String> requiredList = new ArrayList<>();
-                    kv1.putAll(new KV().set("properties", getFields(PsiUtil.resolveClassInType(type), project, childType, index, requiredList)));
-                    kv1.set("required", requiredList);
+                    Map<String, Object> fields = getFields(PsiUtil.resolveClassInType(type), project, childType, index, requiredList);
+                    kv1.put("properties", fields);
+                    kv1.put("required", requiredList);
                 } else {
-                    kv1.putAll(new KV().set("type", pName));
+                    kv1.put("type", pName);
                 }
                 kv.put(name, kv1);
             }
@@ -242,35 +237,33 @@ public class BuildJsonForYapi {
     }
 
     /**
-     * @description: 获得集合
-     * @param: [kv, classTypeName, remark, psiClass, project, name, pName]
-     * @return: void
-     * @author: chengsheng@qbb6.com
-     * @date: 2019/5/15
+     * 填充结合类型集合
      */
-    public static void getCollect(LinkedHashMap<String, Object> kv, String classTypeName, String remark, PsiClass psiClass, Project project, String name, String pName, String[] childType, Integer index) {
-        LinkedHashMap<String, Object> kvlist = new KV();
-        if (NormalTypes.isNormalType(classTypeName) || NormalTypes.COLLECT_TYPES.containsKey(classTypeName)) {
-            kvlist.put("type", classTypeName);
+    public static void doFillCollect(Map<String, Object> kv, String classTypeName, String remark, PsiClass psiClass, Project project, String name, String pName, String[] childType, Integer index) {
+        Map<String, Object> arrays = new LinkedHashMap<>();
+        if (TypeConstant.isNormalType(classTypeName) || TypeConstant.COLLECT_TYPES.containsKey(classTypeName)) {
+            arrays.put("type", classTypeName);
             if (!Strings.isNullOrEmpty(remark)) {
-                kvlist.put("description", remark);
+                arrays.put("description", remark);
             }
         } else {
-            kvlist.putAll(new KV().set("type", "object"));
-            kvlist.putAll(new KV().set("description", (Strings.isNullOrEmpty(remark) ? (psiClass.getName().trim()) : remark + " ," + psiClass.getName().trim())));
+            arrays.put("type", "object");
+            String realRemark = Strings.isNullOrEmpty(remark) ? (psiClass.getName().trim()) : remark + " ," + psiClass.getName().trim();
+            arrays.put("description", realRemark);
             if (!pName.equals(psiClass.getName())) {
                 List<String> requiredList = new ArrayList<>();
-                kvlist.put("properties", getFields(psiClass, project, childType, index, requiredList));
-                kvlist.put("required", requiredList);
+                arrays.put("properties", getFields(psiClass, project, childType, index, requiredList));
+                arrays.put("required", requiredList);
             } else {
-                kvlist.putAll(new KV().set("type", pName));
+                arrays.put("type", pName);
             }
         }
-        KV kv1 = new KV();
-        kv1.putAll(new KV().set("type", "array"));
-        kv1.putAll(new KV().set("description", (Strings.isNullOrEmpty(remark) ? (psiClass.getName().trim()) : remark + " ," + psiClass.getName().trim())));
-        kv1.set("items", kvlist);
-        kv.put(name, kv1);
+        Map<String, Object> collectMap = new LinkedHashMap<>();
+        collectMap.put("type", "array");
+        String realRemark = Strings.isNullOrEmpty(remark) ? (psiClass.getName().trim()) : remark + " ," + psiClass.getName().trim();
+        collectMap.put("description", realRemark);
+        collectMap.put("items", arrays);
+        kv.put(name, collectMap);
     }
 
 
